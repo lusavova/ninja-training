@@ -9,68 +9,73 @@ import (
 	"strings"
 )
 
-type Quiz struct {
+const (
+	questionCol = 0
+	answerCol   = 1
+)
+
+type QuizRecord struct {
 	question string
 	answer   string
 }
 
 func main() {
-	records := getCSVRecords("quiz.csv")
-	quiz := getQuiz(records)
-	score := executeQuiz(quiz)
-	fmt.Printf("Score: %d/%d", score, len(quiz))
-}
-
-func getCSVRecords(fileName string) [][]string {
-	file, err := os.Open(fileName)
+	records, err := getCSVRecords("quiz.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	quiz := getQuiz(records)
+	score, err := executeQuiz(quiz)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Score: %d/%d", score, len(quiz))
+}
+
+func getCSVRecords(fileName string) ([][]string, error) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't open file %s: %w", fileName, err)
+	}
 	defer file.Close()
 
 	csvReader := csv.NewReader(file)
 	records, err := csvReader.ReadAll()
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("couldn't read csv: %w", err)
 	}
 
-	return records
+	return records, nil
 }
 
-func executeQuiz(quiz []Quiz) int {
+func executeQuiz(quiz []QuizRecord) (int, error) {
 	reader := bufio.NewReader(os.Stdin)
-	index := 1
 	score := 0
-	for _, quiz := range quiz {
-		fmt.Printf("Problem %d: %s = ", index, quiz.question)
-		input, _ := reader.ReadString('\n')
+	for i, quiz := range quiz {
+		fmt.Printf("Problem %d: %s = ", i+1, quiz.question)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return 0, fmt.Errorf("couldn't read line: %w", err)
+		}
+
 		input = strings.TrimSpace(input)
 		if input == quiz.answer {
 			score++
 		}
-		index++
 	}
 
-	return score
+	return score, nil
 }
 
-func getQuiz(data [][]string) []Quiz {
-	var quiz []Quiz
-	for i, line := range data {
-		if i == 0 {
-			continue
-		}
-
-		var record Quiz
-		for col, value := range line {
-			if col == 0 {
-				record.question = value
-			} else if col == 1 {
-				record.answer = value
-			}
-		}
-		quiz = append(quiz, record)
+func getQuiz(data [][]string) []QuizRecord {
+	var quiz []QuizRecord
+	for _, line := range data[1:] {
+		quiz = append(quiz, QuizRecord{
+			question: line[questionCol],
+			answer:   line[answerCol],
+		})
 	}
 
 	return quiz
